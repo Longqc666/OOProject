@@ -1,0 +1,46 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+
+actor "读者\n(学生/教师)" as Reader
+actor "图书管理员" as Librarian
+actor "智能助手\n(系统参与者)" as Assistant
+actor "图书馆集成系统\n(外部系统)" as ILS
+
+rectangle "借阅流通子系统" {
+  usecase "UC-03 续借图书" as UC03
+  usecase "身份认证" as UC_Auth
+  usecase "查询借阅记录" as UC_Query
+  usecase "校验续借资格" as UC_Check
+  usecase "计算新应还日期" as UC_Calc
+  usecase "提交续借事务" as UC_Commit
+  usecase "返回续借结果" as UC_Result
+}
+
+Reader --> UC03
+Librarian --> UC03
+Assistant --> UC03
+
+UC03 ..> UC_Auth : <<include>>
+UC03 ..> UC_Query : <<include>>
+UC03 ..> UC_Check : <<include>>
+UC03 ..> UC_Calc : <<include>>
+UC03 ..> UC_Commit : <<include>>
+UC03 ..> UC_Result : <<include>>
+
+UC_Query --> ILS : 查询借阅记录
+UC_Commit --> ILS : 续借事务
+
+note right of UC_Check
+  BR-01 学生≤2次 / 教师≤5次
+  BR-03 有他人预约 → 拒绝
+  BR-04 已逾期 → 拒绝
+  BR-05 不改变预约队列位次
+end note
+
+note right of UC_Calc
+  BR-02 顺延 30 天
+end note
+
+@enduml
