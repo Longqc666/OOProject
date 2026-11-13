@@ -1,0 +1,64 @@
+﻿@startuml 借阅流通子系统_用例图
+' ============================================================
+' 实验一 活动1（手工建模）  借阅流通子系统 用例图
+' 作者：庞华杰  学号：32406300076
+' 范围：借阅流通子系统；智能体编排服务、ILS 均为范围外参与者。
+' ============================================================
+skinparam defaultFontName "Microsoft YaHei"
+skinparam dpi 200
+skinparam nodesep 20
+skinparam ranksep 40
+skinparam usecase {
+  BackgroundColor #F4F8FD
+  BorderColor #2C5E9E
+  ArrowColor #2C5E9E
+  FontSize 13
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #2C5E9E
+  FontSize 13
+}
+
+actor "读者" as Reader
+actor "图书管理员" as Librarian
+actor "智能助手\n(LLM 编排服务)" as Agent
+actor "图书馆集成系统\n(ILS，外部系统)" as ILS
+
+rectangle "借阅流通子系统" {
+  usecase "查询借阅记录" as UC01
+  usecase "借阅图书" as UC02
+  usecase "续借图书" as UC03
+  usecase "预约图书" as UC04
+  usecase "归还图书" as UC05
+  usecase "缴纳逾期罚款" as UC06
+  usecase "接收到期提醒" as UC07
+  usecase "处理借阅异常" as UC08
+
+  usecase "校验读者资格" as UC09
+  usecase "校验续借规则" as UC10
+  usecase "生成缴费单" as UC11
+  usecase "人工覆盖续借结果" as UC12
+}
+
+Reader --> UC01
+Reader --> UC02
+Reader --> UC03
+Reader --> UC04
+Reader --> UC05
+Reader --> UC06
+Reader --> UC07
+Librarian --> UC08
+Agent --> UC03
+Agent --> UC07
+ILS --> UC02
+ILS --> UC03
+ILS --> UC05
+
+UC02 ..> UC09 : <<include>>
+UC03 ..> UC10 : <<include>>
+UC06 ..> UC11 : <<include>>
+UC05 <.. UC06 : <<extend>>
+UC03 <.. UC12 : <<extend>>
+
+@enduml

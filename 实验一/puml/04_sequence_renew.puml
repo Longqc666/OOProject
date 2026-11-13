@@ -1,0 +1,87 @@
+﻿@startuml 续借图书_顺序图
+' ============================================================
+' 实验一 活动1（手工建模）  续借图书用例 动态模型（顺序图）
+' 作者：庞华杰  学号：32406300076
+' 场景：读者通过智能助手以自然语言发起续借，成功率约 80% 的主路径
+'       与"槽位缺失""规则校验不通过"两条备选路径。
+' ============================================================
+skinparam defaultFontName "Microsoft YaHei"
+skinparam dpi 200
+skinparam sequence {
+  ParticipantPadding 14
+  MessageAlign center
+  ArrowColor #2C5E9E
+  ActorBorderColor #2C5E9E
+  LifeLineBorderColor #9DB6D4
+  LifeLineBackgroundColor #F4F8FD
+  ParticipantBorderColor #2C5E9E
+  ParticipantBackgroundColor #E8F0FA
+  FontSize 12
+}
+skinparam note {
+  BackgroundColor #FFFDF0
+  BorderColor #C9A227
+}
+
+participant "读者" as R
+participant "智能助手前端" as UI
+participant "智能体编排服务" as ORCH
+participant "规则检索\n(RAG)" as RAG
+participant "借阅流通服务" as LOAN
+participant "ILS" as ILS
+database "日志库" as DB
+
+R -> UI : 输入："帮我把《算法导论》续借一下"
+UI -> ORCH : POST /chat {sessionId, text, readerId}
+activate ORCH
+
+ORCH -> RAG : 检索"续借规则 + 读者类型"
+activate RAG
+RAG --> ORCH : 规则片段(引用: 借阅管理办法 4.2)
+deactivate RAG
+
+ORCH -> ORCH : 意图识别 = 续借图书\n槽位抽取：bookRef = "算法导论"
+
+alt 槽位不足（未说明是哪一本 / 有多条在借）
+    ORCH --> UI : ask(clarify, 候选列表)
+    UI --> R : "你手上有 2 本同名书，\n是第 2 本（条码 B-2087）吗？"
+    R -> UI : 确认
+    UI -> ORCH : 补充槽位
+end
+
+ORCH -> LOAN : renewLoan(readerId, barcode)
+activate LOAN
+LOAN -> ILS : GET /loans?readerId=
+activate ILS
+ILS --> LOAN : 借阅记录(dueDate, renewCount,\n预约队列长度)
+deactivate ILS
+
+LOAN -> LOAN : policy.check(record, reservation)
+note right of LOAN
+  判定顺序：证状态 → 是否逾期 →
+  续借次数 → 是否有人预约。
+  顺序本身即需求：先给读者最
+  可行动的原因码。
+end note
+
+alt 校验通过
+    LOAN -> ILS : POST /loans/{id}/renew
+    activate ILS
+    ILS --> LOAN : 新应还日期 2026-12-05
+    deactivate ILS
+    LOAN --> ORCH : RenewResult(success, 2026-12-05)
+    ORCH -> DB : 写入会话、工具调用、\n规则引用（可追溯）
+    ORCH --> UI : 自然语言答复 + 规则引用
+    UI --> R : "已续借成功，新到期日 12-05，\n本次为第 1/2 次续借。"
+else 校验不通过
+    LOAN --> ORCH : RenewResult(fail, REASON_RESERVED)
+    ORCH -> DB : 记录失败原因码
+    ORCH --> UI : 解释 + 替代动作建议
+    UI --> R : "该书已有 1 位读者预约，\n按规则不能续借；可帮你预约。"
+end
+
+deactivate LOAN
+deactivate ORCH
+
+@enduml
+

@@ -1,0 +1,60 @@
+﻿@startuml 借阅记录_状态图
+' ============================================================
+' 实验一 活动1（手工建模）  借阅记录（LoanRecord）状态图
+' 作者：庞华杰  学号：32406300076
+' ============================================================
+hide empty description
+skinparam defaultFontName "Microsoft YaHei"
+skinparam dpi 200
+skinparam nodesep 30
+skinparam ranksep 55
+skinparam state {
+  BackgroundColor #F4F8FD
+  BorderColor #2C5E9E
+  ArrowColor #2C5E9E
+  FontSize 13
+}
+skinparam note {
+  BackgroundColor #FFFDF0
+  BorderColor #C9A227
+}
+
+state 借出 : 在借 · renewCount 未达上限
+state 续借校验中 : 瞬时状态 · 判定中
+state 已续借 : 已续借 · dueDate 已顺延
+state 逾期 : 逾期 · 按日生成罚款
+state 已归还 : 已归还 · 有罚款须结清
+state 已丢失 : 已丢失 · 进入赔偿流程
+
+[*] --> 借出 : 借阅成功 / 计算应还日期
+借出 --> 续借校验中 : 读者或智能体发起续借
+续借校验中 --> 已续借 : 校验通过 / renewCount++、\n应还日期顺延 renewDays
+续借校验中 --> 借出 : 校验不通过 [证冻结 / 超次数 /\n逾期 / 有预约] / 返回原因码
+已续借 --> 续借校验中 : 再次续借 [renewCount < 上限]
+借出 --> 逾期 : 超过应还日期 [未归还]
+已续借 --> 逾期 : 超过新应还日期 [未归还]
+借出 --> 已归还 : 归还登记 [无罚款]
+已续借 --> 已归还 : 归还登记 [无罚款]
+逾期 --> 已归还 : 归还登记 / 生成罚款单
+借出 --> 已丢失 : 读者申报丢失
+逾期 --> 已丢失 : 读者申报丢失
+已归还 --> [*]
+已丢失 --> [*]
+
+note right of 续借校验中
+  设为显式状态的理由：续借的判定
+  涉及"证状态—逾期—次数—预约"
+  四项检查，顺序本身即业务规则；
+  把它画出来，顺序图中的 alt/else
+  分支才有状态语义依据。
+end note
+
+note bottom of 已续借
+  已续借不是终态。若忽略"续借后
+  仍可再续借"这一自环，模型会在
+  第二次续借时出现无迁移可走的
+  死锁——这是本次手工建模中发现
+  并修正的一处错误（详见 10.2）。
+end note
+
+@enduml

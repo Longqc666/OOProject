@@ -1,0 +1,159 @@
+﻿@startuml 续借图书_类图
+' ============================================================
+' 实验一 活动1（手工建模）  续借图书用例 静态模型（类图）
+' 作者：庞华杰  学号：32406300076
+' ============================================================
+!pragma layout smetana
+skinparam defaultFontName "Microsoft YaHei"
+skinparam dpi 200
+skinparam classAttributeIconSize 0
+hide circle
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #2C5E9E
+  ArrowColor #2C5E9E
+  FontSize 12
+  HeaderBackgroundColor #E8F0FA
+}
+skinparam note {
+  BackgroundColor #FFFDF0
+  BorderColor #C9A227
+}
+
+' ---------- 领域实体 ----------
+abstract class "读者" as Reader {
+  - readerId : String
+  - name : String
+  - readerType : ReaderType
+  - status : ReaderStatus
+  - maxLoanCount : int
+  + canRenew() : boolean
+  + borrowCount() : int
+}
+
+class "学生读者" as Student {
+  - college : String
+  - maxRenewCount : int = 2
+}
+
+class "教师读者" as Teacher {
+  - department : String
+  - maxRenewCount : int = 5
+}
+
+class "图书" as Book {
+  - isbn : String
+  - title : String
+  - author : String
+  - category : String
+}
+
+class "馆藏副本" as BookCopy {
+  - barcode : String
+  - status : CopyStatus
+  - location : String
+  + isAvailable() : boolean
+}
+
+class "借阅记录" as LoanRecord {
+  - loanId : String
+  - loanDate : Date
+  - dueDate : Date
+  - renewCount : int
+  - state : LoanState
+  + renew(policy) : RenewResult
+  + isOverdue() : boolean
+  + daysToDue() : int
+}
+
+class "续借规则" as RenewalPolicy {
+  - policyId : String
+  - maxRenewCount : int
+  - renewDays : int
+  - allowWhenReserved : boolean
+  - allowWhenOverdue : boolean
+  + check(record, res) : RenewResult
+}
+
+class "预约" as Reservation {
+  - reservationId : String
+  - queuePosition : int
+  - status : ReservationStatus
+  + hasQueueAhead() : boolean
+}
+
+class "逾期罚款" as FineRecord {
+  - fineId : String
+  - amount : BigDecimal
+  - status : FineStatus
+}
+
+class "续借结果" as RenewResult <<value object>> {
+  - success : boolean
+  - reasonCode : String
+  - newDueDate : Date
+  + explain() : String
+}
+
+' ---------- AI 原生部分：智能体协作对象 ----------
+class "智能体会话" as AgentSession {
+  - sessionId : String
+  - channel : Channel {app, miniProgram, kiosk}
+  - intent : String
+  - confidence : double
+  - turnCount : int
+}
+
+class "工具调用" as ToolInvocation {
+  - callId : String
+  - toolName : String
+  - params : String
+  - result : String
+  - timestamp : DateTime
+  - status : CallStatus
+}
+
+abstract class "借阅工具" as BorrowingTool <<interface>> {
+  + name() : String
+  + invoke(params : Map) : ToolResult
+}
+
+class "续借工具" as RenewBookTool {
+  + name() : String = "renew_loan"
+  + invoke(params : Map) : ToolResult
+}
+
+class "查询借阅工具" as QueryLoanTool {
+  + name() : String = "query_loans"
+  + invoke(params : Map) : ToolResult
+}
+
+' ---------- 关系 ----------
+Reader <|-- Student
+Reader <|-- Teacher
+
+Book "1" *-- "1..*" BookCopy : 拥有 >
+
+Reader "1" -- "0..*" LoanRecord : 借阅 >
+BookCopy "1" -- "0..*" LoanRecord : 被借出 >
+
+Reader "1" -- "0..*" Reservation : 提出 >
+Book "1" -- "0..*" Reservation : 被预约 >
+
+LoanRecord "*" --> "1" RenewalPolicy : 适用 >
+LoanRecord "1" -- "0..1" FineRecord : 产生 >
+LoanRecord "0..*" --> "0..1" Reservation : 受制于 >
+
+AgentSession "1" *-- "0..*" ToolInvocation : 记录 >
+AgentSession "0..1" --> "1" Reader : 代理 >
+ToolInvocation "*" --> "1" BorrowingTool : 绑定 >
+
+BorrowingTool <|.. RenewBookTool
+BorrowingTool <|.. QueryLoanTool
+
+LoanRecord ..> RenewResult : 返回 >
+RenewalPolicy ..> RenewResult : 生成 >
+
+
+
+@enduml
