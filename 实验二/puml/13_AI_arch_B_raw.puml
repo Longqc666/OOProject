@@ -1,55 +1,67 @@
 @startuml
-!pragma layout smetana
-skinparam defaultFontName "Microsoft YaHei"
-skinparam defaultFontSize 11
-skinparam shadowing false
+title 方案二 组件图 - 领域服务拆分（借阅核心 / 规则服务 / ILS 网关）
+
 skinparam componentStyle rectangle
-skinparam component {
-  BackgroundColor #FFFFFF
-  BorderColor #7C8FA6
-  ArrowColor #4A6785
-}
 skinparam packageStyle rectangle
 
-package "客户端" {
-  [Web / 小程序] as Client
+actor "读者\n(Web/App)" as Reader
+actor "馆员" as Librarian
+
+package "借阅流通子系统" {
+
+  package "借阅核心服务 Loan Core Service" {
+    [Circulation API\n续借入口] as Api
+    [RenewApplicationService] as AppSvc
+    [RenewDomainService] as RenewDS
+    [Loan 聚合] as LoanAgg
+    [Reservation 聚合] as ResvAgg
+    [Patron / Bib / Item\n本地只读投影] as Projection
+    [AuditWriter\n同源审计] as AuditW
+    [Outbox] as Outbox
+  }
+
+  package "规则服务 Rule Service" {
+    [Rule API\n按版本求值] as RuleApi
+    [RuleSet 版本库\nRuleEvaluator] as RuleEval
+  }
+
+  package "ILS 网关服务 Ils Gateway Service" {
+    [Ils Gateway API\n幂等键/重试/熔断] as IlsGw
+    [IdempotencyStore\n幂等键] as Idem
+    [Reconciler\n对账任务] as Recon
+  }
+
+  package "投影同步器 Projection Sync" {
+    [Patron/Bib/Item\n同步器] as Sync
+  }
 }
 
-package "云托管服务（厂商锁定）" {
-  [API Gateway] as APIGW
-  [对话函数\nChatFn] as Chat
-  [续借函数\nRenewFn] as Renew
-  [规则函数\nRuleFn] as Rule
-  [审计函数\nAuditFn] as Audit
-  [通知函数\nNotifyFn] as Notify
-  [Step Functions\n编排] as SF
-  database "DynamoDB\n会话表" as DDB1
-  database "DynamoDB\n借阅表" as DDB2
-  database "S3\n审计桶" as S3
-  database "OpenSearch\n向量检索" as OS
-  [托管 LLM API] as LLM
-  queue "EventBridge" as EB
+package "外部系统" {
+  [现有 ILS\n(仅 REST)] as ILS
+  [统一身份认证] as SSO
 }
 
-Client --> APIGW
-APIGW --> Chat
-Chat --> LLM
-Chat --> OS
-Chat --> SF
-SF --> Renew
-Renew --> Rule
-Renew --> DDB2
-Chat --> DDB1
-Rule --> DDB2
-Renew --> EB
-EB --> Audit
-EB --> Notify
-Audit --> S3
-Notify --> DDB1
+Reader --> Api
+Librarian --> Api
 
-note right of Renew
-  无服务器函数按需伸缩，
-  按调用计费；
-  状态全部放在托管存储。
-end note
+Api --> AppSvc
+AppSvc --> RenewDS
+AppSvc --> LoanAgg
+AppSvc --> ResvAgg
+AppSvc --> Projection
+AppSvc --> RuleApi : 同步 gRPC/REST\n带规则版本
+AppSvc --> IlsGw : 同步 提交续借\n带幂等键
+AppSvc --> AuditW
+AppSvc --> Outbox
+
+RenewDS --> LoanAgg
+RenewDS --> ResvAgg
+RuleApi --> RuleEval
+IlsGw --> Idem
+IlsGw --> ILS : REST
+Recon --> ILS : 对账查询
+Recon --> IlsGw
+Sync --> Api
+
+Api --> SSO : 鉴权
 @enduml

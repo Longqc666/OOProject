@@ -1,76 +1,101 @@
 @startuml
-!pragma layout smetana
-skinparam defaultFontName "Microsoft YaHei"
-skinparam defaultFontSize 11
-skinparam shadowing false
+title 方案一 组件图 - 模块化单体 + 六边形端口适配器
+
 skinparam componentStyle rectangle
-skinparam component {
-  BackgroundColor #FFFFFF
-  BorderColor #7C8FA6
-  ArrowColor #4A6785
-}
 skinparam packageStyle rectangle
 
-package "客户端" {
-  [Web 前端] as Web
-  [微信小程序] as MP
+actor "读者\n(Web/App)" as Reader
+actor "馆员" as Librarian
+
+package "借阅流通子系统（单一部署单元）" {
+
+  package "入站适配器 Inbound Adapters" {
+    [流通 REST Controller\n(Circulation API)] as InCtrl
+    [ILS 回调/对账入口\n(Reconcile Endpoint)] as RecCtrl
+  }
+
+  package "应用层 Application" {
+    [RenewApplicationService\n续借用例编排] as AppSvc
+    [ReconcileApplicationService\n对账用例] as RecSvc
+  }
+
+  package "领域层 Domain" {
+    package "借阅模块" {
+      [Loan 聚合\nLoan / LoanRenewal] as LoanAgg
+      [RenewDomainService\n续借领域服务] as RenewDS
+    }
+    package "预约模块" {
+      [Reservation 聚合\nReservationQueue] as ResvAgg
+    }
+    package "规则模块" {
+      [RenewRuleSet\n版本化规则] as RuleSet
+      [RuleEvaluator\n规则判定器] as RuleEval
+    }
+    package "馆藏模块" {
+      [BibliographicRecord\n书目] as Bib
+      [Item 副本] as Item
+      [Patron 读者] as Patron
+    }
+  }
+
+  package "出站端口 Outbound Ports (Interfaces)" {
+    [IlsPort\n借还/续借远端调用] as IlsPort
+    [LoanRepositoryPort] as LoanRepoPort
+    [ReservationRepositoryPort] as ResvRepoPort
+    [RuleRepositoryPort] as RuleRepoPort
+    [AuditPort\n同源审计] as AuditPort
+    [IdempotencyPort\n幂等键存储] as IdemPort
+    [OutboxPort\n事务性发件箱] as OutboxPort
+  }
+
+  package "出站适配器 Outbound Adapters" {
+    [IlsRestAdapter\n超时/重试/幂等键] as IlsAdapter
+    [JpaLoanRepository] as LoanRepo
+    [JpaReservationRepository] as ResvRepo
+    [JpaRuleRepository] as RuleRepo
+    [JpaAuditRepository\n与业务同库同事务] as AuditRepo
+    [JpaIdempotencyRepository] as IdemRepo
+    [JpaOutboxRepository] as OutboxRepo
+  }
 }
 
-package "接入层" {
-  [API 网关] as GW
-  [用户服务] as User
+package "外部系统（不画实现细节）" {
+  [现有 ILS\n(仅 REST)] as ILS
+  [统一身份认证] as SSO
 }
 
-package "微服务集群" {
-  [对话服务] as Chat
-  [意图识别服务] as NLU
-  [AI 编排服务] as AI
-  [续借服务] as Renew
-  [借阅服务] as Loan
-  [预约服务] as Res
-  [规则服务] as Rule
-  [审计服务] as Audit
-  [通知服务] as Notify
-  [推荐服务] as Rec
-}
+Reader --> InCtrl
+Librarian --> InCtrl
+InCtrl --> AppSvc
+RecCtrl --> RecSvc
 
-package "基础设施" {
-  queue "Kafka 事件总线" as MQ
-  database "MySQL 集群" as DB
-  database "Redis 缓存" as Cache
-  database "Elasticsearch" as ES
-  [向量数据库] as Vector
-  [大模型 API] as LLM
-}
+AppSvc --> RenewDS
+AppSvc --> RuleEval
+AppSvc --> LoanAgg
+AppSvc --> ResvAgg
+AppSvc --> IlsPort
+AppSvc --> LoanRepoPort
+AppSvc --> ResvRepoPort
+AppSvc --> AuditPort
+AppSvc --> IdemPort
+AppSvc --> OutboxPort
 
-Web --> GW
-MP --> GW
-GW --> User
-GW --> Chat
-Chat --> NLU
-Chat --> AI
-AI --> LLM
-AI --> Vector
-Chat ..> Renew : 续借事件
-Renew --> Rule
-Renew --> Loan
-Renew --> Res
-Renew --> Audit
-Renew --> Notify
-Renew --> Rec
-Loan --> DB
-Res --> DB
-Rule --> DB
-Renew --> Cache
-Renew --> MQ
-Audit --> ES
-Notify --> MQ
-Loan ..> MQ
-Res ..> MQ
+RenewDS --> RuleSet
+RenewDS --> LoanAgg
+RuleEval --> RuleSet
 
-note right of Renew
-  每个微服务独立数据库，
-  通过 Kafka 实现最终一致；
-  续借成功后异步更新借阅读模型。
-end note
+LoanAgg --> Bib
+LoanAgg --> Item
+LoanAgg --> Patron
+
+IlsPort <|.. IlsAdapter
+LoanRepoPort <|.. LoanRepo
+ResvRepoPort <|.. ResvRepo
+RuleRepoPort <|.. RuleRepo
+AuditPort <|.. AuditRepo
+IdemPort <|.. IdemRepo
+OutboxPort <|.. OutboxRepo
+
+IlsAdapter --> ILS : REST
+InCtrl --> SSO : 鉴权
 @enduml
