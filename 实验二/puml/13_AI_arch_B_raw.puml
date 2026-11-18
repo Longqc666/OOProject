@@ -1,0 +1,55 @@
+@startuml
+!pragma layout smetana
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontSize 11
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam component {
+  BackgroundColor #FFFFFF
+  BorderColor #7C8FA6
+  ArrowColor #4A6785
+}
+skinparam packageStyle rectangle
+
+package "客户端" {
+  [Web / 小程序] as Client
+}
+
+package "云托管服务（厂商锁定）" {
+  [API Gateway] as APIGW
+  [对话函数\nChatFn] as Chat
+  [续借函数\nRenewFn] as Renew
+  [规则函数\nRuleFn] as Rule
+  [审计函数\nAuditFn] as Audit
+  [通知函数\nNotifyFn] as Notify
+  [Step Functions\n编排] as SF
+  database "DynamoDB\n会话表" as DDB1
+  database "DynamoDB\n借阅表" as DDB2
+  database "S3\n审计桶" as S3
+  database "OpenSearch\n向量检索" as OS
+  [托管 LLM API] as LLM
+  queue "EventBridge" as EB
+}
+
+Client --> APIGW
+APIGW --> Chat
+Chat --> LLM
+Chat --> OS
+Chat --> SF
+SF --> Renew
+Renew --> Rule
+Renew --> DDB2
+Chat --> DDB1
+Rule --> DDB2
+Renew --> EB
+EB --> Audit
+EB --> Notify
+Audit --> S3
+Notify --> DDB1
+
+note right of Renew
+  无服务器函数按需伸缩，
+  按调用计费；
+  状态全部放在托管存储。
+end note
+@enduml

@@ -1,0 +1,79 @@
+@startuml
+!pragma layout smetana
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontSize 11
+skinparam shadowing false
+skinparam roundCorner 4
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #7C8FA6
+  ArrowColor #4A6785
+}
+hide empty members
+
+class "Reader" as Reader {
+  - id : String
+  - name : String
+  - password : String
+  + renew(bookId : String) : boolean
+}
+
+class "Book" as Book {
+  - isbn : String
+  - title : String
+  - copyList : List<String>
+  + isAvailable() : boolean
+}
+
+class "Loan" as Loan {
+  + id : String
+  + bookId : String
+  + dueDate : Date
+  + renewCount : int
+  + status : String
+  + setDueDate(date : Date) : void
+  + setStatus(status : String) : void
+}
+
+class "RenewalController" as Controller {
+  + postRenew(readerId : String, bookId : String) : boolean
+}
+
+class "RenewalService" as Service {
+  + renew(readerId : String, bookId : String) : boolean
+  - checkRule(readerId : String, bookId : String) : boolean
+  - callIls(bookId : String) : boolean
+  - sendNotify(readerId : String) : void
+  - clearCache(readerId : String) : void
+}
+
+class "RuleEngine" as Rule {
+  + check(reader : Reader, book : Book, loan : Loan) : boolean
+}
+
+class "IlsClient" as Ils {
+  + renew(bookId : String) : boolean
+}
+
+class "NotificationService" as Notify {
+  + send(readerId : String, message : String) : void
+}
+
+class "CacheService" as Cache {
+  + evict(key : String) : void
+}
+
+class "RenewalLog" as Log {
+  + write(readerId : String, bookId : String, result : boolean) : void
+}
+
+Controller --> Service : 调用
+Service --> Rule : 校验
+Service --> Ils : 续借
+Service --> Notify : 通知
+Service --> Cache : 清缓存
+Service --> Log : 记录
+Reader "1" -- "1" Loan : 借阅
+Book "1" -- "1" Loan : 被借
+@enduml

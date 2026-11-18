@@ -1,0 +1,76 @@
+@startuml
+!pragma layout smetana
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontSize 11
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam component {
+  BackgroundColor #FFFFFF
+  BorderColor #7C8FA6
+  ArrowColor #4A6785
+}
+skinparam packageStyle rectangle
+
+package "客户端" {
+  [Web 前端] as Web
+  [微信小程序] as MP
+}
+
+package "接入层" {
+  [API 网关] as GW
+  [用户服务] as User
+}
+
+package "微服务集群" {
+  [对话服务] as Chat
+  [意图识别服务] as NLU
+  [AI 编排服务] as AI
+  [续借服务] as Renew
+  [借阅服务] as Loan
+  [预约服务] as Res
+  [规则服务] as Rule
+  [审计服务] as Audit
+  [通知服务] as Notify
+  [推荐服务] as Rec
+}
+
+package "基础设施" {
+  queue "Kafka 事件总线" as MQ
+  database "MySQL 集群" as DB
+  database "Redis 缓存" as Cache
+  database "Elasticsearch" as ES
+  [向量数据库] as Vector
+  [大模型 API] as LLM
+}
+
+Web --> GW
+MP --> GW
+GW --> User
+GW --> Chat
+Chat --> NLU
+Chat --> AI
+AI --> LLM
+AI --> Vector
+Chat ..> Renew : 续借事件
+Renew --> Rule
+Renew --> Loan
+Renew --> Res
+Renew --> Audit
+Renew --> Notify
+Renew --> Rec
+Loan --> DB
+Res --> DB
+Rule --> DB
+Renew --> Cache
+Renew --> MQ
+Audit --> ES
+Notify --> MQ
+Loan ..> MQ
+Res ..> MQ
+
+note right of Renew
+  每个微服务独立数据库，
+  通过 Kafka 实现最终一致；
+  续借成功后异步更新借阅读模型。
+end note
+@enduml
