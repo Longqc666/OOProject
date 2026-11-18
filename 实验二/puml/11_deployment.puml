@@ -1,0 +1,29 @@
+@startuml
+!pragma layout smetana
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam rectangle {
+  BorderColor #8FA3B8
+  FontColor #1F2937
+}
+skinparam ArrowColor #4A6785
+
+rectangle "用户终端\n浏览器（Web）｜企业微信｜自助机 / OPAC" as Client #F2F6FB
+rectangle "接入区 DMZ\nNginx / API 网关（TLS 终止、限流、鉴权）" as Edge #F2F6FB
+rectangle "应用区 Kubernetes\nassistant-gateway ×2｜assistant-orchestrator ×2｜lending-api ×2｜knowledge-service ×1" as App #EEF6EC
+rectangle "数据区\nPostgreSQL 主从（业务与 Outbox）｜Redis 集群（幂等键）｜对象存储（审计归档）" as Data #FFF8E8
+rectangle "外部服务\nLLM 网关｜图书馆集成系统 ILS｜统一身份认证 CAS" as Ext #F4F4F4
+
+Client --> Edge : HTTPS
+Edge --> App : 路由
+App --> Data : JDBC / Redis / 对象存储
+App --> Ext : REST / HTTPS
+
+note right of App
+  应用区无状态，可水平扩容；
+  lending-api 与 assistant-* 分开部署，
+  LLM 故障不影响自助机与 OPAC 办理。
+end note
+@enduml

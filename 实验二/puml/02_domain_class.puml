@@ -1,0 +1,148 @@
+﻿@startuml
+!pragma layout smetana
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontSize 11
+skinparam shadowing false
+skinparam roundCorner 4
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #7C8FA6
+  ArrowColor #4A6785
+}
+hide empty members
+
+package "领域实体（Entity）" {
+  class "读者\nReader" as Reader {
+    - 读者编号 : 读者编号
+    - 类型 : 读者类型
+    - 账户状态 : 账户状态
+    + 可续借() : boolean
+  }
+
+  class "图书\nBook" as Book {
+    - ISBN : String
+    - 书名 : String
+    + 是否有预约() : boolean
+  }
+
+  class "馆藏副本\nCopy" as Copy {
+    - 条码 : 条码
+    - 馆藏地 : String
+    - 状态 : 副本状态
+  }
+
+  class "借阅记录\nLoanRecord" as Loan {
+    - 记录编号 : String
+    - 借出日期 : Date
+    - 应还日期 : Date
+    - 续借次数 : int
+    - 状态 : 借阅状态
+    + 是否逾期(今天 : Date) : boolean
+    + 续借(新应还日期 : Date) : void
+    + 还可续借(上限 : int) : boolean
+  }
+
+  class "预约\nReservation" as Reservation {
+    - 预约编号 : String
+    - 队列位次 : int
+    - 预约时间 : DateTime
+    + 是否排在(读者 : 读者编号)之前() : boolean
+  }
+
+  class "续借规则\nRenewalPolicy" as Policy {
+    - 规则版本 : String
+    - 学生上限 : int
+    - 教师上限 : int
+    - 顺延天数 : int
+    + 上限(类型 : 读者类型) : int
+    + 新应还日期(当前 : Date) : Date
+  }
+
+  class "续借申请\nRenewalRequest" as Request {
+    - 申请编号 : String
+    - 幂等键 : String
+    - 状态 : 申请状态
+    - 请求时间 : DateTime
+    - 新应还日期 : Date
+    + 标记生效() : void
+    + 标记拒绝(原因 : 失败原因) : void
+  }
+}
+
+package "值对象（Value Object）" {
+  class "读者编号" as ReaderId <<value object>> {
+    - 值 : String
+    + 校验格式() : boolean
+  }
+  class "条码" as Barcode <<value object>> {
+    - 值 : String
+  }
+  class "续借结果" as Result <<value object>> {
+    - 是否成功 : boolean
+    - 原因 : 失败原因
+    - 新应还日期 : Date
+    - 剩余次数 : int
+  }
+}
+
+package "枚举（Enumeration）" {
+  enum "读者类型" as ReaderType {
+    学生
+    教师
+  }
+  enum "账户状态" as AccountStatus {
+    正常
+    冻结
+    欠费
+  }
+  enum "副本状态" as CopyStatus {
+    可借
+    已借出
+    已预约
+    遗失
+  }
+  enum "借阅状态" as LoanStatus {
+    借出
+    已续借
+    逾期
+    已归还
+    已丢失
+  }
+  enum "申请状态" as RequestStatus {
+    已接收
+    校验中
+    待提交
+    已生效
+    已拒绝
+    待对账
+  }
+  enum "失败原因" as ReasonCode {
+    READER_FROZEN
+    OVERDUE
+    QUOTA_EXCEEDED
+    RESERVED_BY_OTHER
+    ILS_TIMEOUT
+  }
+}
+
+Reader "1" -- "0..*" Loan : 借阅 >
+Book "1" *-- "1..*" Copy : 包含 >
+Copy "1" -- "0..*" Loan : 被借 >
+Book "1" -- "0..*" Reservation : 被预约 >
+Reader "1" -- "0..*" Reservation : 排队 >
+Loan "1" -- "0..*" Request : 续借申请 >
+Policy "1" -- "0..*" Request : 版本快照 >
+
+note right of Loan
+  不变式：
+  ① renewCount ≤ policy.上限(reader.type)
+  ② 只有“借出 / 已续借”可发起续借
+  ③ 续借不改变借出日期，只顺延应还日期
+end note
+
+note bottom of Policy
+  规则以版本号固化到续借申请，
+  保证事后审计能还原“当时按哪版规则判定”。
+end note
+@enduml

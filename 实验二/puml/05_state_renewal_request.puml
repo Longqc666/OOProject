@@ -1,0 +1,33 @@
+﻿@startuml
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontSize 12
+skinparam shadowing false
+hide empty description
+skinparam roundCorner 6
+skinparam state {
+  BackgroundColor #FFFFFF
+  BorderColor #7C8FA6
+  ArrowColor #4A6785
+}
+
+state "已接收" as Received
+state "已存在" as Replayed
+state "校验中" as Validating
+state "待提交" as Ready
+state "已生效" as Effective
+state "已拒绝" as Rejected
+state "待对账" as Pending
+
+[*] --> Received : 工具调用
+Received --> Replayed : 幂等键存在
+Replayed --> [*]
+Received --> Validating : 新请求
+Validating --> Rejected : 校验不通过
+Validating --> Ready : 校验通过
+Ready --> Effective : ILS 成功
+Ready --> Pending : ILS 超时
+Pending --> Effective : 对账成功
+Pending --> Rejected : 对账失败
+Effective --> [*]
+Rejected --> [*]
+@enduml

@@ -1,0 +1,65 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontSize 11
+skinparam shadowing false
+skinparam maxMessageSize 110
+skinparam sequence {
+  ArrowColor #4A6785
+  LifeLineBorderColor #9AA7B4
+  ParticipantBorderColor #7C8FA6
+  ParticipantBackgroundColor #FFFFFF
+}
+
+actor "读者" as R
+boundary "对话前端" as UI
+control "智能体编排" as OR
+boundary "续借工具适配器" as TA
+control "续借用例\nRenewBookUseCase" as UC
+control "校验链" as CH
+database "借阅 / 预约仓储" as DB
+participant "ILS 网关" as ILS
+participant "幂等 / 审计" as SIDE
+
+R -> UI : 续借《设计模式》
+UI -> OR : POST /chat
+OR -> OR : 意图识别 / 槽位
+OR -> TA : invoke(renew_book, …)
+TA -> UC : execute(cmd)
+
+UC -> SIDE : 登记 idemKey
+alt 幂等键已存在
+  SIDE --> UC : 上次结果
+  UC --> TA : 原结果（不重复提交）
+else 新请求
+  UC -> DB : 查记录 / 预约
+  DB --> UC : 记录 + 预约
+  UC -> CH : validate(ctx)
+  CH --> UC : 通过 / 原因码
+
+  alt 校验拒绝
+    UC -> SIDE : 写拒绝审计
+    UC --> TA : fail(reason)
+  else 校验通过
+    UC -> UC : 计算新应还日
+    UC -> ILS : renew(…, idemKey)
+    alt ILS 成功
+      ILS --> UC : accepted
+      UC -> DB : 保存记录 + 申请
+      UC -> SIDE : 同事务写 Outbox
+      UC --> TA : ok(newDue, left)
+    else ILS 超时 / 未知
+      UC -> SIDE : 标记待对账
+      UC --> TA : pending()
+    end
+  end
+end
+
+TA --> OR : ToolResult
+OR -> UI : 自然语言答复
+UI -> R : 结果 + 依据 + 替代动作
+
+note over UC, ILS
+  本地事务只覆盖记录、申请、Outbox；
+  ILS 调用在事务外，重试必须复用 idemKey。
+end note
+@enduml

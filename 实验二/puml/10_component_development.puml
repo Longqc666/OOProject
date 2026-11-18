@@ -1,0 +1,49 @@
+﻿@startuml
+!pragma layout smetana
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontSize 11
+skinparam shadowing false
+skinparam roundCorner 4
+skinparam componentStyle rectangle
+skinparam component {
+  BackgroundColor #FFFFFF
+  BorderColor #7C8FA6
+  ArrowColor #4A6785
+}
+skinparam packageStyle rectangle
+
+package "前端与接入" {
+  [assistant-web\n对话前端] as Web
+  [ops-console\n运营与人工介入] as Ops
+}
+
+package "智能体侧" {
+  [assistant-gateway\n会话 · 鉴权 · 限流] as GW
+  [assistant-orchestrator\n意图 · 槽位 · 工具] as OR
+  [knowledge-service\nRAG 检索] as KS
+}
+
+package "借阅流通侧（本次设计重点）" {
+  [lending-api\nREST / Tool 适配] as API
+  [lending-application\n用例 · 校验链 · 事务] as APP
+  [lending-domain\n实体 · 值对象 · 规则] as DOM
+  [lending-infrastructure\n仓储 · ILS · Outbox] as INF
+}
+
+Web --> GW : HTTPS
+Ops --> GW
+Ops --> API
+GW --> OR
+OR --> KS
+OR --> API : REST / JSON
+API --> APP
+APP --> DOM
+APP ..> INF : 通过端口
+INF ..> DOM : 实现端口
+
+note bottom of DOM
+  lending-domain 只依赖 JDK；
+  lending-application 只依赖 domain 与端口接口；
+  lending-infrastructure 提供适配器实现，编译期不反向依赖 application。
+end note
+@enduml

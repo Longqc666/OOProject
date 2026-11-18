@@ -1,0 +1,91 @@
+﻿@startuml
+!pragma layout smetana
+top to bottom direction
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontSize 11
+skinparam shadowing false
+skinparam roundCorner 4
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #7C8FA6
+  ArrowColor #4A6785
+}
+hide empty members
+
+package "边界（Boundary）" {
+  class "续借控制器\nRenewalController" as Controller {
+    + 续借(读者编号, 条码, 幂等键) : RenewalResponse
+  }
+  class "续借工具适配器\nRenewalToolAdapter" as ToolAdapter {
+    + invoke(调用 : ToolCall) : ToolResult
+  }
+}
+
+package "应用服务（Application Service）" {
+  class "续借用例\nRenewBookUseCase" as UseCase {
+    + execute(命令 : RenewalCommand) : RenewalResult
+    - 组装上下文(命令) : RenewalContext
+    - 提交本地事务(记录, 事件) : void
+    - 对账(申请 : RenewalRequest) : void
+  }
+  class "续借命令\nRenewalCommand" as Command <<value object>> {
+    + 读者编号 : ReaderId
+    + 条码 : Barcode
+    + 幂等键 : String
+    + 渠道 : String
+  }
+  class "续借上下文\nRenewalContext" as Context <<value object>> {
+    + 读者 : Reader
+    + 记录 : LoanRecord
+    + 预约队列 : List<Reservation>
+    + 规则 : RenewalPolicy
+  }
+}
+
+package "校验规则（Chain of Responsibility）" {
+  interface "续借校验器\nRenewalValidator" as Validator {
+    + validate(上下文 : RenewalContext) : void
+  }
+  class "校验链\nValidatorChain" as Chain {
+    + validate(上下文 : RenewalContext) : void
+  }
+  class "读者状态校验" as V1 {
+    + validate(上下文) : void
+  }
+  class "逾期校验" as V2 {
+    + validate(上下文) : void
+  }
+  class "次数上限校验" as V3 {
+    + validate(上下文) : void
+  }
+  class "他人预约校验" as V4 {
+    + validate(上下文) : void
+  }
+}
+
+Controller ..> UseCase : 调用
+ToolAdapter ..> UseCase : 调用
+UseCase ..> Command : 输入
+UseCase ..> Context : 组装
+UseCase --> Chain : 使用
+Chain o-- Validator : 持有 0..*
+V1 ..|> Validator
+V2 ..|> Validator
+V3 ..|> Validator
+V4 ..|> Validator
+
+note right of Chain
+  校验顺序固定为：
+  ① 读者状态 → ② 是否逾期
+  → ③ 次数上限 → ④ 他人预约。
+  顺序即“最可行动原因优先”，
+  失败时只返回第一个原因。
+end note
+
+note bottom of UseCase
+  应用服务只依赖端口接口，不依赖
+  PostgreSQL、Redis、ILS SDK 等实现；
+  端口与适配器见图 4。
+end note
+@enduml

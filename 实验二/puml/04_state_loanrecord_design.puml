@@ -1,0 +1,50 @@
+@startuml
+!pragma layout smetana
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam state {
+  BackgroundColor #FFFFFF
+  BorderColor #7C8FA6
+  ArrowColor #4A6785
+  FontSize 12
+}
+
+state "借出\nLoanStatus.LOANED" as Loaned
+state "续借校验中\n瞬时状态" as Validating
+state "已续借\nLoanStatus.RENEWED" as Renewed
+state "逾期\nLoanStatus.OVERDUE" as Overdue
+state "已归还\nLoanStatus.RETURNED" as Returned
+state "已丢失\nLoanStatus.LOST" as Lost
+
+[*] --> Loaned : 借阅成功 / 生成记录
+Loaned : entry / 到期前 3 天提醒
+Loaned --> Validating : 续借请求
+Validating --> Renewed : [校验通过] / dueDate += 30；renewCount++
+Validating --> Loaned : [校验拒绝] / 返回原因码
+Renewed --> Validating : [renewCount < 上限] / 再次续借
+Loaned --> Overdue : 到期未还
+Renewed --> Overdue : 到期未还
+Loaned --> Returned : 归还登记
+Renewed --> Returned : 归还登记
+Overdue --> Returned : 归还并结清罚款
+Loaned --> Lost : 申报丢失 / 盘点缺失
+Renewed --> Lost : 申报丢失 / 盘点缺失
+Overdue --> Lost : 申报丢失 / 盘点缺失
+Returned --> [*]
+Lost --> [*]
+
+note right of Validating
+  瞬时状态，不落库：
+  仅用于把“四项校验”的判定过程
+  显式化，使顺序图的 alt 分支
+  在状态图上有语义落点。
+end note
+
+note bottom of Overdue
+  逾期是独立状态而非“借出”的属性：
+  它改变可用动作集合（不可续借、
+  产生罚款、限制新借）。
+end note
+@enduml

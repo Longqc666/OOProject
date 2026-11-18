@@ -1,0 +1,51 @@
+﻿@startuml
+!pragma layout smetana
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam dpi 200
+skinparam roundCorner 4
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #7C8FA6
+  ArrowColor #4A6785
+}
+hide empty members
+
+class "读者\nreader" as reader {
+  reader_id <<PK>>
+}
+
+class "书目\nbook" as book {
+  isbn <<PK>>
+}
+
+class "馆藏副本\ncopy" as copy {
+  barcode <<PK>>
+  isbn <<FK>>
+}
+
+class "借阅记录\nloan_record" as loan {
+  loan_id <<PK>>
+  reader_id <<FK>>
+  barcode <<FK>>
+}
+
+class "预约\nreservation" as reservation {
+  reservation_id <<PK>>
+  isbn <<FK>>
+  reader_id <<FK>>
+}
+
+reader "1" -- "0..*" loan : 借阅
+book "1" -- "0..*" copy : 包含
+copy "1" -- "0..*" loan : 被借
+book "1" -- "0..*" reservation : 被预约
+reader "1" -- "0..*" reservation : 排队
+
+note right of loan
+  完整列定义见表 9；
+  本图只保留主键、外键与关系基数。
+end note
+@enduml

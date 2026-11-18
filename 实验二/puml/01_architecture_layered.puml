@@ -1,0 +1,29 @@
+@startuml
+!pragma layout smetana
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam rectangle {
+  BorderColor #8FA3B8
+  FontColor #1F2937
+}
+skinparam ArrowColor #4A6785
+
+rectangle "接入层 / 适配器 Adapters\n对话前端（Web · 企业微信）｜自助机 / OPAC｜馆员工作台｜开放 API" as L1 #F2F6FB
+rectangle "应用层 Application\n对话网关（会话 · 鉴权 · 限流）｜智能体编排（意图 · 槽位 · 工具）｜借阅流通应用服务 RenewBookUseCase｜知识检索 RAG" as L2 #EEF6EC
+rectangle "领域层 Domain\n借阅记录 LoanRecord｜馆藏副本 Copy｜预约 Reservation｜续借规则 RenewalPolicy｜领域事件" as L3 #FFF8E8
+rectangle "基础设施层 Infrastructure\nILS 防腐适配器｜PostgreSQL 仓储｜Redis（幂等 / 缓存）｜审计 Outbox｜LLM 网关｜规则配置中心" as L4 #F4F4F4
+
+L1 -down-> L2 : HTTPS / JSON
+L2 -down-> L3 : 只调用领域模型与端口
+L3 -[hidden]down-> L4
+L4 ..> L3 : 实现领域端口（依赖倒置）
+
+note bottom of L4
+  依赖规则：外层依赖内层，内层不感知外层。
+  领域层不依赖 LLM、ILS、数据库与框架；
+  智能体只能经 ITool 端口调用应用服务，
+  不能绕过端口直接改借阅数据。
+end note
+@enduml

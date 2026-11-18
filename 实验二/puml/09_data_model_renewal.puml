@@ -1,0 +1,53 @@
+@startuml
+!pragma layout smetana
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam dpi 200
+skinparam roundCorner 4
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #7C8FA6
+  ArrowColor #4A6785
+}
+hide empty members
+
+class "借阅记录\nloan_record" as loan {
+  loan_id <<PK>>
+  reader_id <<FK>>
+  barcode <<FK>>
+}
+
+class "续借申请\nrenewal_request" as request {
+  request_id <<PK>>
+  loan_id <<FK>>
+  policy_version <<FK>>
+  idempotency_key <<UK>>
+}
+
+class "续借规则版本\npolicy_version" as policy {
+  policy_version <<PK>>
+}
+
+class "续借审计\nrenewal_audit" as audit {
+  audit_id <<PK>>
+  request_id <<FK>>
+}
+
+class "发件箱\noutbox_event" as outbox {
+  event_id <<PK>>
+  aggregate_id <<FK>>
+}
+
+loan "1" -- "0..*" request : 续借申请
+policy "1" -- "0..*" request : 版本快照
+request "1" -- "0..*" audit : 追加
+request "1" -- "0..*" outbox : 发布
+
+note bottom of request
+  唯一约束 idempotency_key；
+  (loan_id, request_status) 建部分索引，
+  保证同一记录最多一条“处理中”申请。
+end note
+@enduml
