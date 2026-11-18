@@ -1021,6 +1021,10 @@ p("方案一把借阅流通做成“单一部署单元”，内部按入站适�
   "领域模块再分为借阅、预约、规则、馆藏四块；ILS、仓储、审计、幂等、Outbox 都通过端口隔离，"
   "其中审计仓储明确标注“与业务同库同事务”，并额外设置了 ILS 回调/对账入口。AI 的自评是："
   "可维护性 5、可扩展性 3、需求匹配度 5。")
+p("图 12 横向元素较多，A4 纸面缩小后标签偏小，这里把它的结构复述一遍：入站适配器是 Circulation API 与 "
+  "Reconcile Endpoint；应用层是 RenewApplicationService 与 ReconcileApplicationService；领域层含借阅、预约、规则、"
+  "馆藏四个模块；出站端口有 IlsPort、LoanRepositoryPort、ReservationRepositoryPort、RuleRepositoryPort、"
+  "AuditPort、IdempotencyPort、OutboxPort；出站适配器是 IlsRestAdapter 与六个 JPA 仓储。")
 p("这份图最值得肯定的地方是“没有把 AI 写进核心”：智能体、LLM、知识检索都没有出现在借阅子系统里，"
   "核心只暴露 REST 与对账入口。它还主动补上了幂等端口、Outbox 端口与对账用例——这三样正是 C2/C4 的落点，"
   "说明 V3 里“C2 幂等与对账、C4 审计同源”的约束被真正读进去了。")
